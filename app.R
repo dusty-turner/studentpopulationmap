@@ -29,7 +29,7 @@ gmap <- gs_title("citymap")
 # Define UI for slider demo app ----
 ui <- dashboardPage(skin = "yellow",
                     # App title ----
-                    dashboardHeader(title = "D Math Pick'em"),
+                    dashboardHeader(title = "MA256 City Population Lookup"),
                     dashboardSidebar(
                       sidebarMenu(
                         menuItem("showmap", tabName = "showmap", icon = icon("newspaper-o")),
