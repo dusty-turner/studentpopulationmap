@@ -1,52 +1,51 @@
+if("shiny" %in% rownames(installed.packages()) == FALSE) {install.packages("shiny")}
+if("httr" %in% rownames(installed.packages()) == FALSE) {install.packages("httr")}
+if("tidyverse" %in% rownames(installed.packages()) == FALSE) {install.packages("dplyr")}
+if("rvest" %in% rownames(installed.packages()) == FALSE) {install.packages("rvest")}
+if("leaflet" %in% rownames(installed.packages()) == FALSE) {install.packages("leaflet")}
+if("shinyAce" %in% rownames(installed.packages()) == FALSE) {install.packages("shinyAce")}
+if("shinyAce" %in% rownames(installed.packages()) == FALSE) {install.packages("shinyAce")}
+if("ggplot2" %in% rownames(installed.packages()) == FALSE) {install.packages("ggplot2")}
+if("googlesheets" %in% rownames(installed.packages()) == FALSE) {install.packages("googlesheets")}
+if("DT" %in% rownames(installed.packages()) == FALSE) {install.packages("DT")}
+if("shinydashboard" %in% rownames(installed.packages()) == FALSE) {install.packages("shinydashboard")}
+
 library(shiny)
-library(dplyr)
-library(lubridate)
+library(tidyverse)
+library(httr)
+library(rvest)
+library(leaflet)
 library(shinyAce)
-library(ggplot2)  # for the diamonds dataset
+library(ggplot2)
 library(googlesheets)
 library(DT)
 library(shinydashboard)
-library(ggmap)
-library(httr)
-library(purrr)
-library(dplyr)
-library(rvest)
-library(stringr)
-library(mailR)
-library(leaflet)
-
-
-# citymap <- gs_new("citymap", input = head(iris, 3), trim = TRUE)
 
 gmap <- gs_title("citymap")
-# winner = data.frame(Game = c("Celebration Bowl", "New Orleans Bowl", "Cure Bowl", "Las Vegas Bowl","New Mexico Bowl","Camellia Bowl", "Cheribundi Tart Cherry Boca Raton Bowl", "DXL Frisco Bowl", "Bad Boy Mowers Gasparilla Bowl", "Bahamas Bowl", "Famous Idaho Potato Bowl", "Birmingham Bowl", "Lockheed Martin Armed Forces Bowl", "Dollar General Bowl", "Hawai'i Bowl", "Zaxby's Heart of Dallas Bowl", "Quick Lane Bowl", "Cactus Bowl", "Walk-On's Independence Bowl", "New Era Pinstripe Bowl", "Foster Farm's Bowl", "Academy Sports + Outdoors Texas Bowl"),
-                    # Winner = c("North Carolina A&T", "Troy", "Georgia State", "Boise State", "Marshall", "Middle Tennessee", " "," "," ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "),
-                    # Away = c("Grambling", "Troy", "Western Kentucky", "Boise State", "Marshall", "Middle Tennessee", "Akron", "Louisiana Tech", "Temple", "UAB", "Central Michigan", "Texas Tech", "San Diego State", "Appalachian State", "Fresno State", "Utah","Duke", "Kansas State","Southern Miss", "Iowa", "Arizona", "Texas"),
-                    # Home = c("North Carolina A&T", "North Texas", "Georgia State", "Oregon", "Colorado State", "Arkansas State", "Florida Atlantic", "SMU", "Florida International", "Ohio", "Wyoming", "South Florida", "Army","Toledo", "Houston","West Virginia", "Northern Illinios", "UCLA", "Florida State", "Boston College", "Purdue", "Texas")
-# )
 
-# http://fontawesome.io/icons/
-# Define UI for slider demo app ----
 ui <- dashboardPage(skin = "yellow",
                     # App title ----
-                    dashboardHeader(title = "MA256 City Population Lookup"),
+                    dashboardHeader(title = "MA256 City Population Lookup", titleWidth = 350),
                     dashboardSidebar(
                       sidebarMenu(
-                        menuItem("showmap", tabName = "showmap", icon = icon("newspaper-o")),
-                        menuItem("showthemap", tabName = "showthemap", icon = icon("newspaper-o")),
-                        menuItem("Information", tabName = "information", icon = icon("dashboard"), startExpanded = TRUE, 
+                        menuItem("Table View", tabName = "poptable", icon = icon("table")),
+                        menuItem("Map View", tabName = "showthemap", icon = icon("map-marker")),
+                        menuItem("Information", tabName = "information", icon = icon("info-circle"), startExpanded = TRUE, 
                                  textInput("city", label = "City", value = "Mason"),
                                  textInput("state", label = "State", value = "Texas")),
                                  actionButton("Search", "Search"),
-                                 actionButton("Upload", "Upload")
+                                 tags$hr(),
+                                 actionButton("Update", "Update")
                       )
                     ),
                     dashboardBody(
                       tabItems(
-                        tabItem(tabName = "showmap",
-                                tags$hr(),
-                                tableOutput("citytable")),
+                        tabItem(tabName = "poptable",
+                                tableOutput("citysummary"),
+                                tableOutput("citytable"),
+                                plotOutput("plot")),
                         tabItem(tabName = "showthemap",
+                                tags$hr(),
                                 leafletOutput("map")
                                 # tableOutput("citytable")
                                 )
@@ -54,18 +53,7 @@ ui <- dashboardPage(skin = "yellow",
                                 )
                         )
 
-
-
-
-
 server <- function(input, output) {
-  
-  # get lat long
-  # values <- reactiveValues()
-  # emails = reactiveValues()
-  
-  # emails$df = data.frame(emailvector = numeric(0))
-  # values$df <- data.frame(City = numeric(0), State = numeric(0), pop = numeric(0), lat = numeric(0), long = numeric(0))
   
   newEntry <- observeEvent(input$Search,{
     cleanedcity = gsub(" ", "%20", input$city)
@@ -116,84 +104,57 @@ server <- function(input, output) {
     
   })
   
-google <- eventReactive(input$Upload==TRUE, {
+google <- eventReactive(input$Update==TRUE, {
   helper = gs_read(gmap)
-})  
+})
 
-    output$citytable <- renderTable({
-      google()
-    })
+output$citytable <- renderTable({
+    google()
+})
+
+output$citysummary <- renderTable({
+  google() %>%
+    summarise(MeanPopulation = mean(Population, na.rm = TRUE), 
+              MedianPopulation = median(Population, na.rm = TRUE),
+              Mean10PCTTrim = mean(Population, trim = .05, na.rm = TRUE)
+    )
+})
+
+output$plot = renderPlot({
+  ggplot(data = google(), aes(y=0,x=Population)) +
+    geom_point() +
+    geom_point(aes(y=0,x=mean(Population, na.rm = TRUE), color = "red")) +
+    geom_point(aes(y=0,x=median(Population, na.rm = TRUE), color = "green")) +
+    geom_point(aes(y=0,x=mean(Population, na.rm = TRUE, trim = .05), color = "blue")) +
+    ylab(NULL) +
+    theme(axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank(),
+          legend.position="none")
+  }, height = 100, width = 600
+)
     
-    output$map <- renderLeaflet({
-      leaflet() %>%  
-        addTiles(options = tileOptions(maxZoom = 28, maxNativeZoom = 19),
-                 group = 'OSM')
-    })
-      
-  ##############
-  
-  # observeEvent(input$Search, {
-  #   output$showmap = renderPlot({
-  #     ggmap(map) +
-  #       geom_point(data = tablevalues(),
-  #                  aes(x = as.numeric(long), y = as.numeric(lat), colour = log(1/Population), alpha = 10, size = 5),
-  #                  shape = 20 ) +
-  #       # scale_colour_gradient(low = "white") 
-  #       theme(legend.position="none") 
-  #     #guides(fill = FALSE,alpha = TRUE,size = FALSE)
-  #   }, height = 700, width = 1000)
-  #   
+output$map <- renderLeaflet({
+  leaflet() %>%
+    addTiles() %>%  
+    setView(lat=37, lng=-96, zoom = 4) 
+})
 
-  # })
-  
-#   sendemailto = observeEvent(input$Submit, {
-#     isolate(emails$df[nrow(emails$df) + 1,] <- c(emailvector = input$emailaddress))
-#     # isolate(emails$df$emailvector = emails$df$emailvector[-input$delete,])
-#     # colnames(emails$df) = c("Cadet_Emails")
-#     return(emails$df)
-#   })
-#   
-#   observeEvent(input$Submit, {
-#     output$emaillist <- renderTable({
-#       emails$df
-#       showitdf = emails$df
-#       colnames(showitdf) = c("Cadet Emails")
-#       return(showitdf)
-#     })
-#   })
-#   
-#   observeEvent(input$Sendemaila, {
-#     wd = paste("C:/Users/", input$first, ".", input$last, "/Downloads", sep = "")
-#     setwd(wd)
-#     for(i in 1:length(emails$df$emailvector)){
-#       send.mail(from="dusty.turner@usma.edu",
-#                 to=as.character(emails$df$emailvector[i]),
-#                 subject = input$subject,
-#                 body = "This is and email from CPT Dusty Turner",
-#                 smtp = list(host.name = "smtp.gmail.com", port = 465, user.name = "dusty.s.turner", passwd = "stewardesses", ssl = TRUE),
-#                 authenticate = TRUE,
-#                 send = TRUE,
-#                 attach.files = "Class Populations.csv",
-#                 debug = FALSE)
-#     }
-#   })
-#   
-#   observeEvent(input$Sendemailb, {
-#     wd = paste("//usmaedu/apollo/math/Userdirs/", input$dirslocation, sep = "")
-#     setwd(wd)
-#     for(i in 1:length(emails$df$emailvector)){
-#       send.mail(from="dusty.turner@usma.edu",
-#                 to=as.character(emails$df$emailvector[i]),
-#                 subject = input$subject,
-#                 body = "This is and email from CPT Dusty Turner",
-#                 smtp = list(host.name = "smtp.gmail.com", port = 465, user.name = "dusty.s.turner", passwd = "stewardesses", ssl = TRUE),
-#                 authenticate = TRUE,
-#                 send = TRUE,
-#                 attach.files = "Class Populations.csv",
-#                 debug = FALSE)
-#     }
-#   })
+observe({
+ leafletProxy("map", data = google()) %>%
+    clearMarkers() %>%
+    addMarkers(lat = google()$Latitude, lng = google()$Longitude, popup = paste(google()$City, google()$State, "<br>Population:", google()$Population, sep = " ")) %>%
+    addCircleMarkers(lat = mean(google()$Latitude), lng = mean(google()$Longitude), 
+               popup = paste("The Mean Population:", round(mean(google()$Population,na.rm = TRUE), digits = 0), 
+                             "<br>LAT:", 
+                             round(mean(google()$Latitude,na.rm = TRUE), digits = 0),
+                             "<br>LONG:", 
+                             round(mean(google()$Longitude,na.rm = TRUE), digits = 0),
+                             sep = " "),
+               color = "green")
+    
+})
+
 }
 
-# Run the application 
 shinyApp(ui = ui, server = server, enableBookmarking = "server", options = list(launch.browser = TRUE))
