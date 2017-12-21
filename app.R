@@ -13,6 +13,7 @@ library(dplyr)
 library(rvest)
 library(stringr)
 library(mailR)
+library(leaflet)
 
 
 # citymap <- gs_new("citymap", input = head(iris, 3), trim = TRUE)
@@ -32,6 +33,7 @@ ui <- dashboardPage(skin = "yellow",
                     dashboardSidebar(
                       sidebarMenu(
                         menuItem("showmap", tabName = "showmap", icon = icon("newspaper-o")),
+                        menuItem("showthemap", tabName = "showthemap", icon = icon("newspaper-o")),
                         menuItem("Information", tabName = "information", icon = icon("dashboard"), startExpanded = TRUE, 
                                  textInput("city", label = "City", value = "Mason"),
                                  textInput("state", label = "State", value = "Texas")),
@@ -43,7 +45,11 @@ ui <- dashboardPage(skin = "yellow",
                       tabItems(
                         tabItem(tabName = "showmap",
                                 tags$hr(),
-                                tableOutput("citytable"))
+                                tableOutput("citytable")),
+                        tabItem(tabName = "showthemap",
+                                leafletOutput("map")
+                                # tableOutput("citytable")
+                                )
                                     )
                                 )
                         )
@@ -55,11 +61,11 @@ ui <- dashboardPage(skin = "yellow",
 server <- function(input, output) {
   
   # get lat long
-  values <- reactiveValues()
-  emails = reactiveValues()
+  # values <- reactiveValues()
+  # emails = reactiveValues()
   
   # emails$df = data.frame(emailvector = numeric(0))
-  values$df <- data.frame(City = numeric(0), State = numeric(0), pop = numeric(0), lat = numeric(0), long = numeric(0))
+  # values$df <- data.frame(City = numeric(0), State = numeric(0), pop = numeric(0), lat = numeric(0), long = numeric(0))
   
   newEntry <- observeEvent(input$Search,{
     cleanedcity = gsub(" ", "%20", input$city)
@@ -110,36 +116,20 @@ server <- function(input, output) {
     
   })
   
-  # observeEvent(input$Upload, {
-  #   gmap = gmap %>%
-  #     gs_add_row(input = newEntry())
-  # })
-  
 google <- eventReactive(input$Upload==TRUE, {
-  # google <- reactive({
   helper = gs_read(gmap)
-  
 })  
 
-
-  # tablevalues = reactive({
-  #   newdf = values$df 
-  #   newdf = newdf %>% group_by(newdf$lat) %>% filter(row_number() == 1)
-  #   #newdf = newdf[is.factor(newdf$pop),]
-  #   newdf$Population = as.integer(as.character(newdf$pop))
-  #   newdf = arrange(newdf, Population)
-  #   return(newdf)
-  # })
-  
-  popaverage = reactive({
-    popvec = as.numeric(as.character(tablevalues()$pop)) 
-    meanpop=mean(popvec)
-    if(is.na(meanpop)==TRUE){
-      return("")
-    }else{
-      return(meanpop)
-    }
-  })
+    output$citytable <- renderTable({
+      google()
+    })
+    
+    output$map <- renderLeaflet({
+      leaflet() %>%  
+        addTiles(options = tileOptions(maxZoom = 28, maxNativeZoom = 19),
+                 group = 'OSM')
+    })
+      
   ##############
   
   # observeEvent(input$Search, {
@@ -153,10 +143,7 @@ google <- eventReactive(input$Upload==TRUE, {
   #     #guides(fill = FALSE,alpha = TRUE,size = FALSE)
   #   }, height = 700, width = 1000)
   #   
-    output$citytable <- renderTable({
-      # tablevalues()[c(1,2,7)]
-      google()
-    })
+
   # })
   
 #   sendemailto = observeEvent(input$Submit, {
@@ -206,23 +193,6 @@ google <- eventReactive(input$Upload==TRUE, {
 #                 debug = FALSE)
 #     }
 #   })
-#   
-#   
-#   
-#   output$popavg = renderPrint({
-#     cat("The average population size is:", popaverage())
-#   })
-#   
-#   output$downloadData <- downloadHandler(
-#     filename = function() {
-#       paste("Class Populations.csv", sep = "_")
-#     },
-#     content = function(file) {
-#       write.csv(tablevalues()[c(1,2,3,4,5,7)], file)
-#     },
-#     contentType = "csv"
-#   )
-#   
 }
 
 # Run the application 
