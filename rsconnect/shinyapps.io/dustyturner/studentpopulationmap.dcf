@@ -1,0 +1,12 @@
+name: studentpopulationmap
+title: studentpopulationmap
+username:
+account: dustyturner
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 254187
+bundleId: 1163861
+url: https://dustyturner.shinyapps.io/studentpopulationmap/
+when: 1515186160.78531
+asMultiple: FALSE
+asStatic: FALSE
